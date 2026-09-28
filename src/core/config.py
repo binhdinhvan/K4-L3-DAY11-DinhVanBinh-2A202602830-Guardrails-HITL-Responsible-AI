@@ -17,8 +17,19 @@ Hai tầng model (không trộn):
 """
 from __future__ import annotations
 
+import io
 import os
+import sys
 from pathlib import Path
+
+# Fix UnicodeEncodeError on Windows terminals (cp1252) that cannot render Vietnamese.
+try:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
 
 _ROOT = Path(__file__).resolve().parents[2]
 
@@ -36,7 +47,7 @@ PROVIDER_OPENROUTER = "openrouter"
 
 # --- Blue Team (LOCKED) ---
 BLUE_PROVIDER = PROVIDER_OPENROUTER
-BLUE_MODEL = "liquid/lfm-2.5-2.6b"
+BLUE_MODEL = "liquid/lfm-2.5-2.6b:free"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 DEFAULT_OPENROUTER_MODEL = BLUE_MODEL  # alias
 
@@ -120,6 +131,7 @@ def blue_client_kwargs() -> dict:
             os.environ.get("OPENROUTER_BASE_URL", OPENROUTER_BASE_URL).strip()
             or OPENROUTER_BASE_URL
         ),
+        "timeout": 5.0,  # Fail fast if OpenRouter is slow/hanging
     }
 
 
@@ -170,7 +182,11 @@ def get_openai_api_key() -> str:
 
 
 def red_openai_client_kwargs() -> dict:
-    return {"api_key": get_openai_api_key() or None}
+    kwargs = {"api_key": get_openai_api_key() or None}
+    base_url = os.environ.get("OPENAI_BASE_URL", "").strip()
+    if base_url:
+        kwargs["base_url"] = base_url
+    return kwargs
 
 
 def red_provider_label(tier: str = "advance") -> str:
@@ -240,7 +256,7 @@ def setup_api_key():
         os.environ["OPENROUTER_API_KEY"] = input(
             "Enter OpenRouter API Key (Blue): "
         ).strip()
-    print(f"Blue  — {blue_provider_label()}  [LOCKED]")
+    print(f"Blue  -- {blue_provider_label()}  [LOCKED]")
 
     red = get_red_provider()
     model = get_red_model()
@@ -248,19 +264,19 @@ def setup_api_key():
         if not os.environ.get("GOOGLE_API_KEY", "").strip():
             os.environ["GOOGLE_API_KEY"] = input("Enter Google API Key (Red): ").strip()
         os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "0"
-        print(f"Red / Red Advance  — gemini:{model}")
+        print(f"Red / Red Advance  -- gemini:{model}")
     else:
         if not get_openai_api_key():
             os.environ["OPENAI_API_KEY"] = input("Enter OpenAI API Key (Red): ").strip()
-        print(f"Red / Red Advance  — openai:{model}")
+        print(f"Red / Red Advance  -- openai:{model}")
 
     print(
-        "Bonus: chọn một — Red tối đa +5 (B1) hoặc Red Advance tối đa +10 (B2)."
+        "Bonus: chon mot -- Red toi da +5 (B1) hoac Red Advance toi da +10 (B2)."
     )
     if is_harder_model():
         print(
-            f"Model khó ({model}) — tuỳ chọn; không đổi tên agent. "
-            f"(Gợi ý: {HARD_OPENAI_MODEL} / {HARD_GEMINI_MODEL})"
+            f"Model kho ({model}) -- tuy chon; khong doi ten agent. "
+            f"(Goi y: {HARD_OPENAI_MODEL} / {HARD_GEMINI_MODEL})"
         )
 
 
